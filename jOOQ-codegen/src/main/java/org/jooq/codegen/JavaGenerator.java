@@ -10730,16 +10730,16 @@ public class JavaGenerator extends AbstractGenerator {
         }
     }
 
-    protected String getType(Database db, SchemaDefinition schema, JavaWriter out, String t, int p, int s, Name u, String javaType, String defaultType) {
-        return getType(db, schema, out, t, p, s, u, javaType, defaultType, Mode.RECORD);
+    protected String getType(Database db, SchemaDefinition schema, JavaWriter out, TypeDefinition typeDef) {
+        return getType(db, schema, out, typeDef, Mode.RECORD);
     }
 
-    protected String getType(Database db, SchemaDefinition schema, JavaWriter out, String t, int p, int s, Name u, String javaType, String defaultType, Mode udtMode) {
-        return getType(db, schema, out, t, p, s, u, javaType, defaultType, udtMode, null);
+    protected String getType(Database db, SchemaDefinition schema, JavaWriter out, TypeDefinition typeDef, Mode udtMode) {
+        return getType(db, schema, out, typeDef, udtMode, null);
     }
 
-    protected String getType(Database db, SchemaDefinition schema, JavaWriter out, String t, int p, int s, Name u, String javaType, String defaultType, Mode udtMode, XMLTypeDefinition xmlType) {
-        String type = defaultType;
+    protected String getType(Database db, SchemaDefinition schema, JavaWriter out, TypeDefinition typeDef, Mode udtMode, XMLTypeDefinition xmlType) {
+        String type = typeDef.getDefaultType();
 
         // XML types
         if (xmlType != null) {
@@ -10747,49 +10747,22 @@ public class JavaGenerator extends AbstractGenerator {
         }
 
         // Custom types
-        else if (javaType != null) {
-            type = javaType;
+        else if (typeDef.getJavaType() != null) {
+            type = typeDef.getJavaType();
         }
 
         // Array types
-        else if (db.isArrayType(t)) {
+        else if (db.isArrayType(typeDef.getType())) {
 
             // [#4388] TODO: Improve array handling
-            BaseType bt = GenerationUtil.getArrayBaseType(db.getDialect(), t, u);
+            BaseType bt = GenerationUtil.getArrayBaseType(db.getDialect(), typeDef.getType(), typeDef.getUserType());
 
             // [#9067] Prevent StackOverflowErrors
-            String newT = t.equals(bt.t()) ? "OTHER" : bt.t();
+            String newT = typeDef.getType().equals(bt.t()) ? "OTHER" : bt.t();
 
             // [#10309] TODO: The schema should be taken from baseType, if available. Might be different than the argument schema.
             //          When can this happen?
-            String baseType = getType(db, schema, out, newT, p, s, bt.u(), javaType, defaultType, udtMode);
-
-            if (scala)
-                type = "scala.Array[" + baseType + "]";
-            else if (kotlin)
-                type = "kotlin.Array<" + baseType + "?>";
-            else
-                type = baseType + "[]";
-        }
-
-        // Check for Oracle-style VARRAY types
-        else if (db.getArray(schema, u) != null) {
-            boolean udtArray = db.getArray(schema, u).getElementType(resolver(out)).isUDT();
-
-            if (udtMode == Mode.POJO || (udtMode == Mode.INTERFACE && !udtArray)) {
-                if (scala)
-                    type = "java.util.List[" + getJavaType(db.getArray(schema, u).getElementType(resolver(out, udtMode)), out, udtMode) + "]";
-                else
-                    type = "java.util.List<" + getJavaType(db.getArray(schema, u).getElementType(resolver(out, udtMode)), out, udtMode) + ">";
-            }
-            else if (udtMode == Mode.INTERFACE) {
-                if (scala)
-                    type = "java.util.List[_ <:" + getJavaType(db.getArray(schema, u).getElementType(resolver(out, udtMode)), out, udtMode) + "]";
-                else
-                    type = "java.util.List<? extends " + getJavaType(db.getArray(schema, u).getElementType(resolver(out, udtMode)), out, udtMode) + ">";
-            }
-            else {
-                type = getStrategy().getFullJavaClassName(db.getArray(schema, u), Mode.RECORD);
+            String baseType = getType(db, schema, out, newT, typeDef.getPrecision(), typeDef.getScale(), bt.u(), typeDef.getJavaType(), typeDef.getDefaultType(), udtMode);
             }
         }
 
